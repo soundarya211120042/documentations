@@ -1,0 +1,117 @@
+docker swarm installation
+==================================
+
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker $USER
+# re-login or:
+newgrp docker
+
+MANAGER_IP=13.126.171.252
+docker swarm init --advertise-addr $MANAGER_IP
+
+(oot@ip-172-31-32-142:/home/ubuntu# MANAGER_IP=13.126.171.252
+docker swarm init --advertise-addr $MANAGER_IP
+Swarm initialized: current node (5cbn9s9pmp6o9oelu853d9fnv) is now a manager.
+
+To add a worker to this swarm, run the following command:
+
+    docker swarm join --token SWMTKN-1-22exaepklfiu2d6cichi2gs659nlgyd5boc65fv7j8pu6wdhw4-b8muufib49rv1t50m8costkv3 13.126.171.252:2377
+
+To add a manager to this swarm, run 'docker swarm join-token manager' and follow the instructions.
+root@ip-172-31-32-142:/home/ubuntu# )
+
+
+   
+# 3.1 Overlay network (for Jenkins + agents)
+docker network create -d overlay --attachable jenkins-net
+
+# 3.2 Label manager node for Jenkins placement
+MANAGER_NODE=$(docker node ls --format '{{.Hostname}}' | head -n1)
+docker node update --label-add jenkins=true $MANAGER_NODE
+
+# 3.3 Persistent volume for Jenkins home
+docker volume create jenkins-data
+
+===========================================================
+
+stack.yml
+
+===============================
+
+version: "3.9"
+
+services:
+  jenkins:
+    image: jenkins/jenkins:2.492.3-lts-jdk17
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    networks:
+      - jenkins-net
+    volumes:
+      - jenkins-data:/var/jenkins_home
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.jenkins == true
+      resources:
+        limits:
+          cpus: "1"
+          memory: "2G"
+
+networks:
+  jenkins-net:
+    external: true
+
+volumes:
+  jenkins-data:
+    external: true
+    
+    
+=====================================================
+
+docker stack deploy -c jenkins-stack.yml jenkins
+docker stack services jenkins
+docker stack ps jenkins
+
+# Find the running Jenkins container (when deployed as stack)
+CID=$(docker ps --filter "name=jenkins_jenkins" -q)
+# If service-create method used, filter by name=jenkins
+[ -z "$CID" ] && CID=$(docker ps --filter "name=jenkins" -q)
+
+docker exec -it $CID bash -lc 'cat /var/jenkins_home/secrets/initialAdminPassword'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+
